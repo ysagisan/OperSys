@@ -112,6 +112,10 @@ void *copy_dir(void *arg) {
         if (lstat(task->src_path, &statbuf) == 0) {
             mode_t dst_mode = statbuf.st_mode & 0777;
 
+            if (access(task->src_path, R_OK) != 0) {
+                fprintf(stderr, "can't access src_path: %s\n", strerror(errno));
+            }
+
             err = pthread_mutex_lock(&dir_lock);
             if (err != EXIT_SUCCESS) {
                 fprintf(stderr, "<ERROR>: pthread_mutex_lock() failed: %s\n", strerror(errno));
