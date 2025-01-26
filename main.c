@@ -14,7 +14,9 @@ const int CODE_FATAL = -1001;
 const int CODE_SUCCESS = 0;
 const int CODE_ERROR = 1;
 
-pthread_mutex_t dir_lock = PTHREAD_MUTEX_INITIALIZER;
+int NUM_THREADS;
+pthread_t threads[];
+
 char first_dst_path[PATH_MAX];
 
 void dir_close(void *dir) {
@@ -98,13 +100,17 @@ void *copy_file(const char *src_path, const char *dst_path) {
 }
 
 void *copy_dir(void *arg) {
+
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
     TaskQueue *queue = (TaskQueue *)arg;
     int err;
 
-    while (queue->head != NULL) {
-        Task *task = pop_task(queue);
+    while (1) {
+        Task *task = pop_task(queue, NUM_THREADS);
 
-        if (!task) {
+        if (task == NULL) {
             break;
         }
 
@@ -117,7 +123,7 @@ void *copy_dir(void *arg) {
                 continue;
             }
 
-            err = pthread_mutex_lock(&dir_lock);
+
             if (err != EXIT_SUCCESS) {
                 fprintf(stderr, "<ERROR>: pthread_mutex_lock() failed: %s\n", strerror(errno));
             }
@@ -145,7 +151,6 @@ void *copy_dir(void *arg) {
                     if (entry_buffer == NULL) {
                         fprintf(stderr, "<ERROR>: malloc() failed for entry_buffer\n");
                         closedir(dir);
-                        pthread_mutex_unlock(&dir_lock);
                         continue;
                     }
 
@@ -156,11 +161,15 @@ void *copy_dir(void *arg) {
                         }
 
                         char *new_src_path = (char *)malloc(path_max);
-                        char *new_dst_path = (char *)malloc(path_max);
+                        char *new_dst_path = (char *)malloc(path_max); // малоки не нужны
                         snprintf(new_src_path, path_max, "%s/%s", task->src_path, entry->d_name);
                         snprintf(new_dst_path, path_max, "%s/%s", task->dst_path, entry->d_name);
 
-                        if (strcmp(first_dst_path, new_src_path) == 0) {
+                        struct stat stat1, stat2;
+                        stat(first_dst_path, &stat1);
+                        stat(new_src_path, &stat2);
+
+                        if (stat1.st_ino == stat2.st_ino) {
                             continue;
                         }
 
@@ -178,14 +187,14 @@ void *copy_dir(void *arg) {
             } else if (S_ISREG(statbuf.st_mode)) {
                 copy_file(task->src_path, task->dst_path);
             }
-            err = pthread_mutex_unlock(&dir_lock);
             if (err != EXIT_SUCCESS) {
                 fprintf(stderr, "<ERROR>: pthread_mutex_unlock() failed: %s\n", strerror(errno));
             }
         }
         free_task(task);
     }
-    return NULL;
+
+    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
@@ -200,8 +209,9 @@ int main(int argc, char *argv[]) {
 
     strncpy(first_dst_path, dst_path, strlen(dst_path));
 
+    NUM_THREADS = atoi(argv[3]);
     TaskQueue queue;
-    init_task_queue(&queue);
+    init_task_queue(&queue, NUM_THREADS);
 
     struct stat st;
     if (stat(dst_path, &st) != 0) {
@@ -213,8 +223,7 @@ int main(int argc, char *argv[]) {
 
     push_task(&queue, src_path, dst_path);
 
-    const int NUM_THREADS = atoi(argv[3]);
-    pthread_t threads[NUM_THREADS];
+
     for (int i = 0; i < NUM_THREADS; i++) {
         err = pthread_create(&threads[i], NULL, copy_dir, &queue);
         if (err != EXIT_SUCCESS) {
@@ -230,5 +239,8 @@ int main(int argc, char *argv[]) {
             return -1;
         }
     }
+
+    destroy_task_queue(&queue);
+
     return EXIT_SUCCESS;
 }

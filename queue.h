@@ -20,14 +20,16 @@ typedef struct {
     Task *head;
     Task *tail;
     pthread_mutex_t lock;
+    pthread_cond_t cond;
+    pthread_cond_t cond_exit;
+    int cnt_sleep_threads;
 } TaskQueue;
 
 // Функции работы с очередью задач
-void init_task_queue(TaskQueue *queue);
+void init_task_queue(TaskQueue *queue, int NUM_THREADS);
 void push_task(TaskQueue *queue, const char *src_path, const char *dst_path);
-Task *pop_task(TaskQueue *queue);
+Task *pop_task(TaskQueue *queue, int NUM_THREADS);
 void finish_task_queue(TaskQueue *queue);
 void free_task(Task *task);
-void skip_task(TaskQueue *queue);
-
+void destroy_task_queue(TaskQueue *queue);
 #endif // TASK_QUEUE_H
