@@ -114,6 +114,7 @@ void *copy_dir(void *arg) {
 
             if (access(task->src_path, R_OK) != 0) {
                 fprintf(stderr, "can't access src_path: %s\n", strerror(errno));
+                continue;
             }
 
             err = pthread_mutex_lock(&dir_lock);
