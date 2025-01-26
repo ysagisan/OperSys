@@ -15,7 +15,6 @@ const int CODE_SUCCESS = 0;
 const int CODE_ERROR = 1;
 
 int NUM_THREADS;
-pthread_t threads[];
 
 char first_dst_path[PATH_MAX];
 
@@ -160,8 +159,8 @@ void *copy_dir(void *arg) {
                             continue;
                         }
 
-                        char *new_src_path = (char *)malloc(path_max);
-                        char *new_dst_path = (char *)malloc(path_max); // малоки не нужны
+                        char new_src_path[path_max];
+                        char new_dst_path[path_max];
                         snprintf(new_src_path, path_max, "%s/%s", task->src_path, entry->d_name);
                         snprintf(new_dst_path, path_max, "%s/%s", task->dst_path, entry->d_name);
 
@@ -174,8 +173,6 @@ void *copy_dir(void *arg) {
                         }
 
                         push_task(queue, new_src_path, new_dst_path);
-                        free(new_src_path);
-                        free(new_dst_path);
                     }
 
                     if (err != 0) {
@@ -210,6 +207,7 @@ int main(int argc, char *argv[]) {
     strncpy(first_dst_path, dst_path, strlen(dst_path));
 
     NUM_THREADS = atoi(argv[3]);
+    pthread_t threads[NUM_THREADS];
     TaskQueue queue;
     init_task_queue(&queue, NUM_THREADS);
 
