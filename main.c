@@ -132,7 +132,9 @@ void *copy_dir(void *arg) {
                 if (dir) {
                     long name_max = pathconf(task->src_path, _PC_NAME_MAX);
                     if (name_max == -1) {
-                        name_max = 255;
+                        fprintf(stderr, "<ERROR>: pathconf() failed: %s\n", strerror(errno));
+                        closedir(dir);
+                        continue;
                     }
 
                     size_t entry_buffer_size = sizeof(struct dirent) + name_max + 1;
